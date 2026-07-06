@@ -32,6 +32,7 @@ import javax.annotation.Nullable;
 
 import java.io.Serializable;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -68,6 +69,7 @@ public class MySqlSourceConfig implements Serializable {
     private final boolean closeIdleReaders;
     private final Properties jdbcProperties;
     private final Map<ObjectPath, String> chunkKeyColumns;
+    private final Map<String, String> seedSchemas;
     private final boolean skipSnapshotBackfill;
     private final boolean parseOnLineSchemaChanges;
     public static boolean useLegacyJsonFormat = true;
@@ -112,7 +114,8 @@ public class MySqlSourceConfig implements Serializable {
             boolean parseOnLineSchemaChanges,
             boolean treatTinyInt1AsBoolean,
             boolean useLegacyJsonFormat,
-            boolean assignUnboundedChunkFirst) {
+            boolean assignUnboundedChunkFirst,
+            Map<String, String> seedSchemas) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -158,6 +161,7 @@ public class MySqlSourceConfig implements Serializable {
         this.treatTinyInt1AsBoolean = treatTinyInt1AsBoolean;
         this.useLegacyJsonFormat = useLegacyJsonFormat;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
+        this.seedSchemas = seedSchemas == null ? new HashMap<>() : seedSchemas;
     }
 
     public String getHostname() {
@@ -290,6 +294,15 @@ public class MySqlSourceConfig implements Serializable {
 
     public Map<ObjectPath, String> getChunkKeyColumns() {
         return chunkKeyColumns;
+    }
+
+    /**
+     * Old {@code CREATE TABLE} DDL per {@code "db.table"} used to seed the decoding schema on a
+     * cold binlog start. Empty by default; see {@link
+     * org.apache.flink.cdc.connectors.mysql.source.utils.TableDiscoveryUtils}.
+     */
+    public Map<String, String> getSeedSchemas() {
+        return seedSchemas;
     }
 
     public boolean isSkipSnapshotBackfill() {

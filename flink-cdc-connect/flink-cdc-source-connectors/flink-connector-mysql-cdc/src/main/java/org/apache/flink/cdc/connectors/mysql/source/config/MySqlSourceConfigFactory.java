@@ -42,6 +42,9 @@ public class MySqlSourceConfigFactory implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    private static final org.slf4j.Logger LOG =
+            org.slf4j.LoggerFactory.getLogger(MySqlSourceConfigFactory.class);
+
     private int port = 3306; // default 3306 port
     private String hostname;
     private String username;
@@ -71,6 +74,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private Duration heartbeatInterval = MySqlSourceOptions.HEARTBEAT_INTERVAL.defaultValue();
     private Properties dbzProperties;
     private Map<ObjectPath, String> chunkKeyColumns = new HashMap<>();
+    private Map<String, String> seedSchemas = new HashMap<>();
     private boolean skipSnapshotBackfill = false;
     private boolean parseOnLineSchemaChanges = false;
     private boolean treatTinyInt1AsBoolean = true;
@@ -165,6 +169,17 @@ public class MySqlSourceConfigFactory implements Serializable {
      */
     public MySqlSourceConfigFactory chunkKeyColumn(Map<ObjectPath, String> chunkKeyColumns) {
         this.chunkKeyColumns.putAll(chunkKeyColumns);
+        return this;
+    }
+
+    /**
+     * Old {@code CREATE TABLE} DDL keyed by {@code "db.table"}, used to seed the decoding schema on
+     * a cold binlog start instead of live {@code SHOW CREATE TABLE}. Optional.
+     */
+    public MySqlSourceConfigFactory seedSchemas(Map<String, String> seedSchemas) {
+        if (seedSchemas != null) {
+            this.seedSchemas.putAll(seedSchemas);
+        }
         return this;
     }
 
@@ -410,6 +425,15 @@ public class MySqlSourceConfigFactory implements Serializable {
             jdbcProperties = new Properties();
         }
 
+        if (!seedSchemas.isEmpty() && !isPureBinlogStartup(startupOptions)) {
+            LOG.warn(
+                    "seedSchemas was set ({} entries) but startup mode is {}; the seed-schema "
+                            + "override only applies to a cold binlog start (earliest/timestamp/"
+                            + "specific-offset with no state) and will be ignored here.",
+                    seedSchemas.size(),
+                    startupOptions.startupMode);
+        }
+
         return new MySqlSourceConfig(
                 hostname,
                 port,
@@ -441,6 +465,18 @@ public class MySqlSourceConfigFactory implements Serializable {
                 parseOnLineSchemaChanges,
                 treatTinyInt1AsBoolean,
                 useLegacyJsonFormat,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                seedSchemas);
+    }
+
+    private static boolean isPureBinlogStartup(StartupOptions startupOptions) {
+        switch (startupOptions.startupMode) {
+            case EARLIEST_OFFSET:
+            case TIMESTAMP:
+            case SPECIFIC_OFFSETS:
+                return true;
+            default:
+                return false;
+        }
     }
 }

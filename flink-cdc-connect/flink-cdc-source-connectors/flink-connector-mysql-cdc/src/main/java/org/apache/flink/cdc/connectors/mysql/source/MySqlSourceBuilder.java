@@ -24,6 +24,7 @@ import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.table.catalog.ObjectPath;
 
 import java.time.Duration;
+import java.util.Map;
 import java.util.Properties;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -126,6 +127,16 @@ public class MySqlSourceBuilder<T> {
      */
     public MySqlSourceBuilder<T> chunkKeyColumn(ObjectPath objectPath, String chunkKeyColumn) {
         this.configFactory.chunkKeyColumn(objectPath, chunkKeyColumn);
+        return this;
+    }
+
+    /**
+     * Old {@code CREATE TABLE} DDL keyed by {@code "db.table"}, used to seed the decoding schema on
+     * a cold binlog start (earliest/timestamp/specific-offset with no Flink state) instead of live
+     * {@code SHOW CREATE TABLE}. The DDL must describe the schema in effect *at the start offset*.
+     */
+    public MySqlSourceBuilder<T> seedSchemas(Map<String, String> seedSchemas) {
+        this.configFactory.seedSchemas(seedSchemas);
         return this;
     }
 
