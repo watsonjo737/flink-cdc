@@ -17,7 +17,8 @@
 - Logging: no `INFO`/`DEBUG`. Guardrail messages are `WARN` (they carry operational-alert value).
 - Delivery: internal fork; keep changes minimal and localized.
 - Build a single module: `mvn -pl flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc -am ...`.
-- Conventional commits; include a Jira ID in the scope once available (e.g. `feat(CDH-1234): ...`). Co-author line required on every commit.
+- Base branch: `tejanshrana/flink-cdc @ release-3.5-custom-2` (the internal fork). Line numbers below were derived from `master`; locate edits by the named symbol, not the line number.
+- Conventional commits with scope `mysql-cdc` (Jira ID omitted for now). Co-author line required on every commit.
 
 All paths below are relative to the module root unless absolute.
 
@@ -500,7 +501,7 @@ In `TableDiscoveryUtils.java`, replace the body of the 4-arg
         if (capturedTableIds.isEmpty()) {
             throw new IllegalArgumentException(
                     String.format(
-                            "No matched tables found. Please verify:\n1) The configured database(s) [%s] and table(s) [%s] exist;\n2) The MySQL user has sufficient permissions to access them.",
+                            "Can't find any matched tables, please check your configured database-name: %s and table-name: %s",
                             sourceConfig.getDatabaseList(), sourceConfig.getTableList()));
         }
 
