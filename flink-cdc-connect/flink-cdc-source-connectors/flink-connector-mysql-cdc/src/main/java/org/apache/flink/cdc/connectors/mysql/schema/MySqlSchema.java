@@ -70,6 +70,25 @@ public class MySqlSchema implements AutoCloseable {
         return schema;
     }
 
+    /**
+     * Builds a {@link TableChange} for {@code tableId} directly from a supplied {@code CREATE
+     * TABLE} DDL, bypassing {@code SHOW CREATE TABLE}. Used to seed the schema on a cold binlog
+     * start when the current DB schema no longer matches the rows at the start offset.
+     */
+    public TableChange parseTableSchema(
+            MySqlPartition partition, TableId tableId, String createTableDdl) {
+        final Map<TableId, TableChange> tableChangeMap = new HashMap<>();
+        parseSchemaByDdl(partition, createTableDdl, tableId, tableChangeMap);
+        TableChange tableChange = tableChangeMap.get(tableId);
+        if (tableChange == null) {
+            throw new FlinkRuntimeException(
+                    String.format(
+                            "Failed to parse seed schema DDL for table %s. DDL was: %s",
+                            tableId, createTableDdl));
+        }
+        return tableChange;
+    }
+
     // ------------------------------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------------------------------
