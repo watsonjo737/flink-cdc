@@ -135,3 +135,22 @@ separately in cdh-parent.
   *at the start offset*."
 - **Version-bump maintenance:** internal fork carries the patch across flink-cdc upgrades. Change is
   small and localized to reduce merge cost.
+
+## Operational caveats (from final review)
+
+- **A wrong seed is baked into checkpoint state and cannot be corrected by re-editing `seedSchemas`.**
+  A seeded cold start writes the seeded `TableChange` into the binlog split's `tableSchemas`, which is
+  persisted to every checkpoint (`MySqlSplitSerializer.writeTableSchemas`). On restore the connector
+  reads the schema from state and does **not** re-consult `seedSchemas`. So if the supplied DDL was
+  wrong, editing `seedSchemas` and restoring will not fix it — you must discard state and do a fresh
+  cold start. Upside: a *correct* seeded cold start gives you a reusable pre-DDL snapshot for free.
+  Operators must get the DDL right on the first cold start.
+- **Seed keys must match the server's normalized `db.table` casing.** `seedKey` is
+  `tableId.catalog() + "." + tableId.table()`. On a case-insensitive server, `TableId` may be
+  normalized, so a key with different casing silently misses → per-table fallback to
+  `SHOW CREATE TABLE` → the original crash. The unknown-key WARN partially surfaces this. Document
+  that keys must match the normalized casing.
+- **Do not combine `seedSchemas` with `scanNewlyAddedTableEnabled` expecting the seed to apply to
+  newly-added tables.** By design the seed applies only on cold start; tables discovered mid-stream
+  are read from live `SHOW CREATE TABLE` (see `discoverSeededSchemaForCapturedTables` vs the pure
+  `discoverSchemaForCapturedTables` overload).
