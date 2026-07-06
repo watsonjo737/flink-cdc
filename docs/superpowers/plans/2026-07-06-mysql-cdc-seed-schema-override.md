@@ -17,7 +17,7 @@
 - Logging: no `INFO`/`DEBUG`. Guardrail messages are `WARN` (they carry operational-alert value).
 - Delivery: internal fork; keep changes minimal and localized.
 - Build a single module: `mvn -pl flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc -am ...`.
-- Base branch: `tejanshrana/flink-cdc @ release-3.5-custom-2` (the internal fork). Line numbers below were derived from `master`; locate edits by the named symbol, not the line number.
+- Base branch: `watsonjo737/flink-cdc @ release-3.5-custom-3` (the internal fork; = `custom-2` + one unrelated SSL commit `e39d3d73` that touches no file this feature changes). Line numbers below were derived from `master`; locate edits by the named symbol, not the line number.
 - Conventional commits with scope `mysql-cdc` (Jira ID omitted for now). Co-author line required on every commit.
 
 All paths below are relative to the module root unless absolute.
