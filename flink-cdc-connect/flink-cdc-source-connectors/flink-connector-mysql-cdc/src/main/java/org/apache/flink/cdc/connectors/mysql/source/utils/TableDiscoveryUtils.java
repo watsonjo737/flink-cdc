@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.utils;
 
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.mysql.schema.MySqlSchema;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -105,6 +106,13 @@ public class TableDiscoveryUtils {
         return capturedTableIds;
     }
 
+    /**
+     * Cold-start entry point: discovers schemas for all currently captured tables when a binlog
+     * split has no table schemas yet (e.g. a brand new job, or one restored before schemas were
+     * captured). This is the ONLY path that should honor {@code seedSchemas}, since it is the only
+     * place where the live DB schema may already have diverged from the DDL in effect at the
+     * requested binlog start offset.
+     */
     public static Map<TableId, TableChange> discoverSchemaForCapturedTables(
             MySqlPartition partition, MySqlSourceConfig sourceConfig, MySqlConnection jdbc) {
         final List<TableId> capturedTableIds;
@@ -115,7 +123,8 @@ public class TableDiscoveryUtils {
         } catch (SQLException e) {
             throw new FlinkRuntimeException("Failed to discover captured tables", e);
         }
-        return discoverSchemaForCapturedTables(partition, capturedTableIds, sourceConfig, jdbc);
+        return discoverSeededSchemaForCapturedTables(
+                partition, capturedTableIds, sourceConfig, jdbc);
     }
 
     public static Map<TableId, TableChange> discoverSchemaForNewAddedTables(
@@ -142,6 +151,39 @@ public class TableDiscoveryUtils {
     }
 
     public static Map<TableId, TableChange> discoverSchemaForCapturedTables(
+            MySqlPartition partition,
+            List<TableId> capturedTableIds,
+            MySqlSourceConfig sourceConfig,
+            MySqlConnection jdbc) {
+        if (capturedTableIds.isEmpty()) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Can't find any matched tables, please check your configured database-name: %s and table-name: %s",
+                            sourceConfig.getDatabaseList(), sourceConfig.getTableList()));
+        }
+
+        // fetch table schemas
+        try (MySqlSchema mySqlSchema =
+                new MySqlSchema(sourceConfig, jdbc.isTableIdCaseSensitive())) {
+            Map<TableId, TableChange> tableSchemas = new HashMap<>();
+            for (TableId tableId : capturedTableIds) {
+                tableSchemas.put(tableId, mySqlSchema.getTableSchema(partition, jdbc, tableId));
+            }
+            return tableSchemas;
+        }
+    }
+
+    /**
+     * Seed-aware variant of {@link #discoverSchemaForCapturedTables(MySqlPartition, List,
+     * MySqlSourceConfig, MySqlConnection)} used ONLY on cold start (see {@link
+     * #discoverSchemaForCapturedTables(MySqlPartition, MySqlSourceConfig, MySqlConnection)}).
+     * Tables whose {@code db.table} key is present in {@code sourceConfig.getSeedSchemas()} are
+     * built directly from the supplied DDL instead of running {@code SHOW CREATE TABLE} / {@code
+     * DESC}. This must never be used for the scan-newly-added-tables path: a table added mid-job
+     * has to reflect the live DB schema, not a possibly stale seed DDL.
+     */
+    @VisibleForTesting
+    static Map<TableId, TableChange> discoverSeededSchemaForCapturedTables(
             MySqlPartition partition,
             List<TableId> capturedTableIds,
             MySqlSourceConfig sourceConfig,

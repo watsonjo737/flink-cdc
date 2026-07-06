@@ -23,6 +23,9 @@ import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.table.catalog.ObjectPath;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.Serializable;
 import java.time.Duration;
 import java.time.ZoneId;
@@ -42,8 +45,7 @@ public class MySqlSourceConfigFactory implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    private static final org.slf4j.Logger LOG =
-            org.slf4j.LoggerFactory.getLogger(MySqlSourceConfigFactory.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceConfigFactory.class);
 
     private int port = 3306; // default 3306 port
     private String hostname;
