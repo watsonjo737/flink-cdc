@@ -32,8 +32,10 @@ import org.slf4j.LoggerFactory;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -151,15 +153,48 @@ public class TableDiscoveryUtils {
                             sourceConfig.getDatabaseList(), sourceConfig.getTableList()));
         }
 
+        final Map<String, String> seedSchemas = sourceConfig.getSeedSchemas();
+        warnOnUnknownSeedKeys(seedSchemas, capturedTableIds);
+
         // fetch table schemas
         try (MySqlSchema mySqlSchema =
                 new MySqlSchema(sourceConfig, jdbc.isTableIdCaseSensitive())) {
             Map<TableId, TableChange> tableSchemas = new HashMap<>();
             for (TableId tableId : capturedTableIds) {
-                TableChange tableSchema = mySqlSchema.getTableSchema(partition, jdbc, tableId);
+                String seedDdl = seedSchemas.get(seedKey(tableId));
+                TableChange tableSchema;
+                if (seedDdl != null) {
+                    tableSchema = mySqlSchema.parseTableSchema(partition, tableId, seedDdl);
+                } else {
+                    tableSchema = mySqlSchema.getTableSchema(partition, jdbc, tableId);
+                }
                 tableSchemas.put(tableId, tableSchema);
             }
             return tableSchemas;
+        }
+    }
+
+    private static String seedKey(TableId tableId) {
+        return tableId.catalog() + "." + tableId.table();
+    }
+
+    private static void warnOnUnknownSeedKeys(
+            Map<String, String> seedSchemas, List<TableId> capturedTableIds) {
+        if (seedSchemas.isEmpty()) {
+            return;
+        }
+        Set<String> capturedKeys = new HashSet<>();
+        for (TableId tableId : capturedTableIds) {
+            capturedKeys.add(seedKey(tableId));
+        }
+        for (String key : seedSchemas.keySet()) {
+            if (!capturedKeys.contains(key)) {
+                LOG.warn(
+                        "seedSchemas contains an entry for '{}' which is not a captured table; "
+                                + "it will be ignored. Captured tables: {}",
+                        key,
+                        capturedKeys);
+            }
         }
     }
 }
